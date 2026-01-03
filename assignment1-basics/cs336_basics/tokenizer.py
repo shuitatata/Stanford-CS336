@@ -186,21 +186,6 @@ def train_bpe(
         # Merge and add to vocabulary
         first, second = pair_to_merge
 
-        # debug
-        # print((vocab[first], vocab[second]))
-        # if (vocab[first], vocab[second]) == (b" c", b"om"):
-        #     print(pair_counts[(first, second)])
-        # tops = pair_counts.most_common(10)
-        # print_list = []
-
-        # for token, freq in tops:
-        #     if vocab[token[0]] == b" c":
-        #         stop = True
-        #     print_list.append(((vocab[token[0]], vocab[token[1]]), freq))
-        # print(print_list)
-        # if stop:
-        #     input()
-
         vocab[next_token_id] = vocab[first] + vocab[second]
         len_vocab += 1
         merges.append((vocab[first], vocab[second]))
@@ -219,7 +204,7 @@ def train_bpe(
             new_pair_list = []
             i = 0
             while i < pre_token_len:
-                # 检查是否匹配目标 Pair (A, B)
+                # Check pair(A, B)
                 if (
                     (i < pre_token_len - 1)
                     and (pre_token[i] == first)
@@ -227,19 +212,15 @@ def train_bpe(
                 ):
 
                     new_pair_list.append(new_token_id)
-                    i += 2  # 跳过两个
+                    i += 2  # skip 2 bytes
                 else:
                     new_pair_list.append(pre_token[i])
                     i += 1
 
-            # 存入新字典 (注意：这里千万不要加 if len >= 2 的判断，防止吞掉单字 token)
+            # Save to new dict
             if new_pair_list:
                 new_total_counts[tuple(new_pair_list)] += pre_token_freq
 
-        # print((vocab[pair_to_merge[0]], vocab[pair_to_merge[1]]))
-
-        # print(vocab[pair_to_merge[0]] + vocab[pair_to_merge[1]])
-        # input()
 
         total_counts = new_total_counts
 
@@ -265,11 +246,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-
-    # corpus = "111<|endoftext|>222<|endoftext|>333 444<|endoftext|>"
-
-    # print(pre_tokenize(corpus, ["<|endoftext|>"]))
     pr = cProfile.Profile()
     # tracemalloc.start()
     pr.enable()
@@ -286,20 +262,16 @@ if __name__ == "__main__":
 
     with open("./data/TinyStories_vocab.json", "w") as f:
         vocab_to_save = {
-            str(token_id): token_bytes.decode("latin-1") for token_id, token_bytes in vocab.items()
+            str(token_id): token_bytes.decode("latin-1")
+            for token_id, token_bytes in vocab.items()
         }
         json.dump(vocab_to_save, f, ensure_ascii=False, indent=2)
-    
+
     with open("./data/TinyStories_merges.txt", "w") as f:
         for first, second in merges:
             f.write(f"{first.decode("latin-1")} {second.decode("latin-1")}\n")
-
-
 
     # current, peak = tracemalloc.get_traced_memory()
 
     # print(f"The peak memory use is {peak/1024/1024} MB")
     # tracemalloc.stop()
-
-    # print(vocab)
-    # print(merges)
