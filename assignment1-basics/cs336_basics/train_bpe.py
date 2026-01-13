@@ -85,7 +85,7 @@ class PairItem:
 def pre_tokenize(
     input_corpus: str,
     special_tokens: list[str],
-) -> dict[tuple[int, ...], int]:
+) -> collections.Counter:
     """Pre_tokenize the corpus.
 
     This function first splits the corpus by the provided special tokens to ensure boundaries are respected. Then, it applies the GPT-2 regex pattern to segment the text into linguistic units (pre-tokens) and encodes them into UTF-8 bytes.
@@ -340,9 +340,14 @@ if __name__ == "__main__":
         }
         json.dump(vocab_to_save, f, ensure_ascii=False, indent=2)
 
-    with open("./data/TinyStories_merges.txt", "w") as f:
-        for first, second in merges:
-            f.write(f"{first.decode("latin-1")} {second.decode("latin-1")}\n")
+    with open("./data/TinyStories_merges.json", "w") as f:
+        merges_to_save = [
+            (first.decode("latin-1"), second.decode("latin-1"))
+            for first, second in merges
+        ]
+        json.dump(merges_to_save, f, ensure_ascii=False, indent=2)
+        # for first, second in merges:
+        #     f.write(f"{first.decode("latin-1")} {second.decode("latin-1")}\n")
 
     # current, peak = tracemalloc.get_traced_memory()
 
