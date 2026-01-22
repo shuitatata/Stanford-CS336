@@ -91,7 +91,17 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+
+    from cs336_basics import SwiGLU
+
+    ffn = SwiGLU(d_model, d_ff)
+    state_dict = {
+        "w1.weight": w1_weight,
+        "w2.weight": w2_weight,
+        "w3.weight": w3_weight,
+    }
+    ffn.load_state_dict(state_dict)
+    return ffn(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -208,8 +218,9 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
-
+    from cs336_basics import RotaryPositionalEmbedding
+    rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
+    return rope(in_query_or_key, token_positions)
 
 def run_transformer_block(
     d_model: int,
@@ -386,6 +397,13 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
+    from cs336_basics import RMSNorm
+
+    rms_norm = RMSNorm(d_model, eps)
+    state_dict = {"g": weights}
+    rms_norm.load_state_dict(state_dict)
+    return rms_norm(in_features)
+
     raise NotImplementedError
 
 
