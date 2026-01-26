@@ -122,7 +122,9 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    from cs336_basics import scaled_dot_product_attention
+
+    return scaled_dot_product_attention(Q, K, V, mask)
 
 
 def run_multihead_self_attention(
@@ -156,7 +158,18 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+
+    from cs336_basics import MultiHeadAttention
+
+    mha = MultiHeadAttention(d_model, num_heads)
+    state_dict = {
+        "w_o.weight": o_proj_weight,
+        "w_q.weight": q_proj_weight,
+        "w_k.weight": k_proj_weight,
+        "w_v.weight": v_proj_weight,
+    }
+    mha.load_state_dict(state_dict)
+    return mha(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -196,7 +209,24 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+
+    from cs336_basics import MultiHeadAttention
+
+    mha = MultiHeadAttention(
+        d_model,
+        num_heads,
+        rope_theta=theta,
+        rope_max_seq_len=max_seq_len,
+    )
+
+    state_dict = {
+        "w_o.weight": o_proj_weight,
+        "w_q.weight": q_proj_weight,
+        "w_k.weight": k_proj_weight,
+        "w_v.weight": v_proj_weight,
+    }
+    mha.load_state_dict(state_dict)
+    return mha(in_features, use_rope=True, token_positions=token_positions)
 
 
 def run_rope(
@@ -219,8 +249,10 @@ def run_rope(
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
     from cs336_basics import RotaryPositionalEmbedding
+
     rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
     return rope(in_query_or_key, token_positions)
+
 
 def run_transformer_block(
     d_model: int,
@@ -418,7 +450,9 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    from cs336_basics import SiLU
+
+    return SiLU(in_features)
 
 
 def run_get_batch(
@@ -457,7 +491,9 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    from cs336_basics import softmax
+
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(

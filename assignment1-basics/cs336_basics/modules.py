@@ -1,8 +1,9 @@
 import torch
 from torch import nn, Tensor
 import math
-from einops import einsum
+from einops import einsum, rearrange
 from jaxtyping import Bool, Float, Int
+from .utils import softmax
 
 
 class Linear(nn.Module):
@@ -153,3 +154,125 @@ class RotaryPositionalEmbedding(nn.Module):
         return out
 
 
+def scaled_dot_product_attention(
+    Q: Float[Tensor, "... q_len d_k"],
+    K: Float[Tensor, "... k_len d_k"],
+    V: Float[Tensor, "... k_len d_v"],
+    mask: Bool[Tensor, "q_len k_len"],
+) -> Float[Tensor, "... q_len d_v"]:
+
+    d_k = Q.shape[-1]
+    scale = 1 / math.sqrt(d_k)
+
+    attn_scores = scale * einsum(
+        Q, K, "... q_len d_k, ... k_len d_k -> ... q_len k_len"
+    )
+    attn_scores = attn_scores.masked_fill(~mask, -torch.inf)
+    attn_probs = softmax(attn_scores, dim=-1)
+    attn_out = einsum(attn_probs, V, "... q_len k_len, ... k_len d_v -> ... q_len d_v")
+
+    return attn_out
+
+
+class MultiHeadAttention(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        dim_k: int | None = None,
+        dim_v: int | None = None,
+        rope_theta: int | None = None,
+        rope_max_seq_len: int | None = None,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = self.d_model // self.num_heads if dim_k == None else dim_k
+        self.d_v = self.d_k if dim_v == None else dim_v
+
+        # x: [..., seq_len, d_model]
+        # Init projectors
+        self.w_q = Linear(
+            d_model, self.num_heads * self.d_k, device=device, dtype=dtype
+        )
+        self.w_k = Linear(
+            d_model, self.num_heads * self.d_k, device=device, dtype=dtype
+        )
+        self.w_v = Linear(
+            d_model, self.num_heads * self.d_v, device=device, dtype=dtype
+        )
+        self.w_o = Linear(self.num_heads * self.d_v, d_model)
+
+        # Init RoPE module
+        if rope_theta != None and rope_max_seq_len != None:
+            self.rope = RotaryPositionalEmbedding(
+                rope_theta, self.d_k, rope_max_seq_len, device=device
+            )
+        elif rope_theta != None or rope_max_seq_len != None:
+            raise ValueError(
+                "Both rope_theta and rope_max_seq_len should be provided for RotaryPositionalEmbedding."
+            )
+        else:
+            self.rope = None
+
+    def forward(
+        self,
+        x: Float[Tensor, "... seq_len d_model"],
+        use_rope: bool = False,
+        token_positions: Int[Tensor, "... seq_len"] | None = None,
+    ):
+
+        if use_rope and token_positions == None:
+            raise ValueError("token_positions must be provided when use_rope is True.")
+
+        seq_len = x.shape[-2]
+
+        q_proj = self.w_q(x)
+        k_proj = self.w_k(x)
+        v_proj = self.w_v(x)
+
+        q = rearrange(
+            q_proj,
+            "... seq_len (h d_k) -> ... h seq_len d_k",
+            h=self.num_heads,
+            d_k=self.d_k,
+        )
+        k = rearrange(
+            k_proj,
+            "... seq_len (h d_k) -> ... h seq_len d_k",
+            h=self.num_heads,
+            d_k=self.d_k,
+        )
+        v = rearrange(
+            v_proj,
+            "... seq_len (h d_v) -> ... h seq_len d_v",
+            h=self.num_heads,
+            d_v=self.d_v,
+        )
+
+        if use_rope and token_positions != None:
+            if self.rope == None:
+                raise ValueError(
+                    "RoPE module is not initialized in MultiHeadAttention."
+                )
+            else:
+                q = self.rope(q, token_positions)
+                k = self.rope(k, token_positions)
+
+        causal_mask = torch.ones((seq_len, seq_len), dtype=bool, device=x.device)
+        causal_mask = torch.triu(causal_mask, 1)
+        causal_mask = ~causal_mask
+
+        attn_out_batch_head = scaled_dot_product_attention(
+            q, k, v, causal_mask
+        )  # [... h seq_len d_v]
+
+        attn_out = rearrange(
+            attn_out_batch_head, "... h seq_len d_v -> ... seq_len (h d_v)"
+        )
+
+        out = self.w_o(attn_out)
+
+        return out
