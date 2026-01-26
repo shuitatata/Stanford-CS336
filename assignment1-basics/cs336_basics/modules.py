@@ -71,7 +71,7 @@ class RMSNorm(nn.Module):
         self.d_model = d_model
         self.eps = eps
 
-        self.g = nn.Parameter(torch.ones(d_model, device=device, dtype=dtype))
+        self.weight = nn.Parameter(torch.ones(d_model, device=device, dtype=dtype))
 
     def forward(self, x: Tensor) -> Tensor:
         in_dtype = x.dtype
@@ -79,7 +79,7 @@ class RMSNorm(nn.Module):
 
         rms_x = torch.sqrt((x**2).mean(dim=-1, keepdim=True) + self.eps)
 
-        result = x * self.g / rms_x
+        result = x * self.weight / rms_x
 
         return result.to(in_dtype)
 
@@ -194,16 +194,16 @@ class MultiHeadAttention(nn.Module):
 
         # x: [..., seq_len, d_model]
         # Init projectors
-        self.w_q = Linear(
+        self.q_proj = Linear(
             d_model, self.num_heads * self.d_k, device=device, dtype=dtype
         )
-        self.w_k = Linear(
+        self.k_proj = Linear(
             d_model, self.num_heads * self.d_k, device=device, dtype=dtype
         )
-        self.w_v = Linear(
+        self.v_proj = Linear(
             d_model, self.num_heads * self.d_v, device=device, dtype=dtype
         )
-        self.w_o = Linear(self.num_heads * self.d_v, d_model)
+        self.output_proj = Linear(self.num_heads * self.d_v, d_model)
 
         # Init RoPE module
         if rope_theta != None and rope_max_seq_len != None:
@@ -229,9 +229,9 @@ class MultiHeadAttention(nn.Module):
 
         seq_len = x.shape[-2]
 
-        q_proj = self.w_q(x)
-        k_proj = self.w_k(x)
-        v_proj = self.w_v(x)
+        q_proj = self.q_proj(x)
+        k_proj = self.k_proj(x)
+        v_proj = self.v_proj(x)
 
         q = rearrange(
             q_proj,
@@ -273,6 +273,45 @@ class MultiHeadAttention(nn.Module):
             attn_out_batch_head, "... h seq_len d_v -> ... seq_len (h d_v)"
         )
 
-        out = self.w_o(attn_out)
+        out = self.output_proj(attn_out)
 
         return out
+
+
+class TransformerBlock(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dim_k: int | None = None,
+        dim_v: int | None = None,
+        rope_theta: int | None = None,
+        rope_max_seq_len: int | None = None,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ):
+        super().__init__()
+        self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.attn = MultiHeadAttention(
+            d_model,
+            num_heads,
+            dim_k,
+            dim_v,
+            rope_theta,
+            rope_max_seq_len,
+            dtype,
+            device,
+        )
+        self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+
+    def forward(
+        self,
+        x: Float[Tensor, "... seq_len d_model"],
+        use_rope: bool = False,
+        token_positions: Int[Tensor, "... seq_len"] | None = None,
+    ):
+        y = x + self.attn(self.ln1(x), use_rope, token_positions)
+        result = y + self.ffn(self.ln2(y))
+        return result
