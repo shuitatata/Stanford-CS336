@@ -325,3 +325,71 @@ class TransformerBlock(nn.Module):
         y = x + self.attn(self.ln1(x), use_rope, token_positions)
         out = y + self.ffn(self.ln2(y))
         return out
+
+
+class TransformerLM(nn.Module):
+    def __init__(
+        self,
+        vocab_size: int,
+        context_length: int,
+        num_layers: int,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dim_k: int | None = None,
+        dim_v: int | None = None,
+        rope_theta: int | None = None,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ):
+        super().__init__()
+        self.context_length = context_length
+
+        self.token_embeddings = Embedding(
+            vocab_size, d_model, device=device, dtype=dtype
+        )
+
+        self.layers = nn.ModuleList(
+            [
+                TransformerBlock(
+                    d_model,
+                    num_heads,
+                    d_ff,
+                    dim_k,
+                    dim_v,
+                    rope_theta,
+                    context_length,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
+
+    def forward(self, in_indices: Int[Tensor, "batch_size sequence_length"]):
+        batch_size = in_indices.shape[0]
+        seq_len = in_indices.shape[1]
+
+        if seq_len > self.layers[0].attn.rope.max_seq_len:
+            raise ValueError(
+                f"Input sequence length {seq_len} exceeds the maximum sequence length {self.context_length} supported by RoPE."
+            )
+
+        x = self.token_embeddings(
+            in_indices
+        )  # Float[Tensor, "batch_size sequnce_length d_model"]
+
+        token_positions = torch.arange(
+            0, seq_len, device=x.device, dtype=torch.long
+        ).expand((batch_size, seq_len))
+        for layer in self.layers:
+            x = layer(
+                x, use_rope=True, token_positions=token_positions
+            )  # Float[Tensor, "batch_size sequence_length d_model"]
+
+        x = self.ln_final(x)  # Float[Tensor, "batch_size sequence_length d_model"]
+        x = self.lm_head(x)  # Float[Tensor, "batch_size sequence_length vocab_size"]
+        return x
