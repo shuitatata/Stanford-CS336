@@ -163,13 +163,13 @@ def run_multihead_self_attention(
 
     mha = MultiHeadAttention(d_model, num_heads)
     state_dict = {
-        "w_o.weight": o_proj_weight,
-        "w_q.weight": q_proj_weight,
-        "w_k.weight": k_proj_weight,
-        "w_v.weight": v_proj_weight,
+        "output_proj.weight": o_proj_weight,
+        "q_proj.weight": q_proj_weight,
+        "k_proj.weight": k_proj_weight,
+        "v_proj.weight": v_proj_weight,
     }
     mha.load_state_dict(state_dict)
-    return mha(in_features)
+    return mha(in_features, use_rope=False)
 
 
 def run_multihead_self_attention_with_rope(
@@ -220,10 +220,10 @@ def run_multihead_self_attention_with_rope(
     )
 
     state_dict = {
-        "w_o.weight": o_proj_weight,
-        "w_q.weight": q_proj_weight,
-        "w_k.weight": k_proj_weight,
-        "w_v.weight": v_proj_weight,
+        "output_proj.weight": o_proj_weight,
+        "q_proj.weight": q_proj_weight,
+        "k_proj.weight": k_proj_weight,
+        "v_proj.weight": v_proj_weight,
     }
     mha.load_state_dict(state_dict)
     return mha(in_features, use_rope=True, token_positions=token_positions)
@@ -342,8 +342,9 @@ def run_transformer_block(
 
     transformer_block.load_state_dict(weights)
 
-    return transformer_block(in_features, use_rope=True, token_positions = token_positions)
-
+    return transformer_block(
+        in_features, use_rope=True, token_positions=token_positions
+    )
 
 
 def run_transformer_lm(
@@ -451,7 +452,7 @@ def run_rmsnorm(
     from cs336_basics import RMSNorm
 
     rms_norm = RMSNorm(d_model, eps)
-    state_dict = {"g": weights}
+    state_dict = {"weight": weights}
     rms_norm.load_state_dict(state_dict)
     return rms_norm(in_features)
 

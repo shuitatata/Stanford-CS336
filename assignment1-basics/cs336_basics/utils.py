@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 
-def softmax(x: Tensor, dim: int):
+def softmax(x: Tensor, dim: int = -1):
     in_dtype = x.dtype
     x = x.to(dtype=torch.float32)
     values = torch.amax(x, dim=dim, keepdim=True)

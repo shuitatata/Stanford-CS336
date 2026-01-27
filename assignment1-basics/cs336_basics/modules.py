@@ -11,6 +11,7 @@ class Linear(nn.Module):
         self,
         in_features: int,
         out_features: int,
+        *,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -43,6 +44,7 @@ class Embedding(nn.Module):
         self,
         num_embeddings: int,
         embedding_dim: int,
+        *,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -64,6 +66,7 @@ class RMSNorm(nn.Module):
         self,
         d_model: int,
         eps: float = 1e-5,
+        *,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -93,6 +96,7 @@ class SwiGLU(nn.Module):
         self,
         d_model: int,
         d_ff: int = None,
+        *,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -103,9 +107,9 @@ class SwiGLU(nn.Module):
         else:
             self.d_ff = d_ff
 
-        self.w1 = Linear(self.d_model, self.d_ff, device, dtype)
-        self.w2 = Linear(self.d_ff, self.d_model, device, dtype)
-        self.w3 = Linear(self.d_model, self.d_ff, device, dtype)
+        self.w1 = Linear(self.d_model, self.d_ff, device=device, dtype=dtype)
+        self.w2 = Linear(self.d_ff, self.d_model, device=device, dtype=dtype)
+        self.w3 = Linear(self.d_model, self.d_ff, device=device, dtype=dtype)
 
     def forward(self, x: Tensor):
         xw1 = self.w1(x)
@@ -114,11 +118,13 @@ class SwiGLU(nn.Module):
 
 
 class RotaryPositionalEmbedding(nn.Module):
-    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, *, device=None):
         super().__init__()
         self.theta = theta
         self.d_k = d_k
-        assert d_k % 2 == 0
+        if d_k % 2 != 0:
+            raise ValueError("d_k must be even for RoPE.")
+
         self.max_seq_len = max_seq_len
         self._init_rope_cache(device)
 
@@ -183,6 +189,7 @@ class MultiHeadAttention(nn.Module):
         dim_v: int | None = None,
         rope_theta: int | None = None,
         rope_max_seq_len: int | None = None,
+        *,
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ):
@@ -203,7 +210,9 @@ class MultiHeadAttention(nn.Module):
         self.v_proj = Linear(
             d_model, self.num_heads * self.d_v, device=device, dtype=dtype
         )
-        self.output_proj = Linear(self.num_heads * self.d_v, d_model)
+        self.output_proj = Linear(
+            self.num_heads * self.d_v, d_model, device=device, dtype=dtype
+        )
 
         # Init RoPE module
         if rope_theta != None and rope_max_seq_len != None:
@@ -220,7 +229,7 @@ class MultiHeadAttention(nn.Module):
     def forward(
         self,
         x: Float[Tensor, "... seq_len d_model"],
-        use_rope: bool = False,
+        use_rope: bool = True,
         token_positions: Int[Tensor, "... seq_len"] | None = None,
     ):
 
@@ -261,9 +270,9 @@ class MultiHeadAttention(nn.Module):
                 q = self.rope(q, token_positions)
                 k = self.rope(k, token_positions)
 
-        causal_mask = torch.ones((seq_len, seq_len), dtype=bool, device=x.device)
-        causal_mask = torch.triu(causal_mask, 1)
-        causal_mask = ~causal_mask
+        causal_mask = torch.tril(
+            torch.ones(seq_len, seq_len, dtype=bool, device=x.device)
+        )
 
         attn_out_batch_head = scaled_dot_product_attention(
             q, k, v, causal_mask
@@ -288,6 +297,7 @@ class TransformerBlock(nn.Module):
         dim_v: int | None = None,
         rope_theta: int | None = None,
         rope_max_seq_len: int | None = None,
+        *,
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ):
@@ -300,8 +310,8 @@ class TransformerBlock(nn.Module):
             dim_v,
             rope_theta,
             rope_max_seq_len,
-            dtype,
-            device,
+            dtype=dtype,
+            device=device,
         )
         self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
@@ -309,9 +319,9 @@ class TransformerBlock(nn.Module):
     def forward(
         self,
         x: Float[Tensor, "... seq_len d_model"],
-        use_rope: bool = False,
+        use_rope: bool = True,
         token_positions: Int[Tensor, "... seq_len"] | None = None,
-    ):
+    ) -> Float[Tensor, "... seq_len d_model"]:
         y = x + self.attn(self.ln1(x), use_rope, token_positions)
-        result = y + self.ffn(self.ln2(y))
-        return result
+        out = y + self.ffn(self.ln2(y))
+        return out
