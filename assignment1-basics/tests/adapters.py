@@ -469,8 +469,6 @@ def run_rmsnorm(
     rms_norm.load_state_dict(state_dict)
     return rms_norm(in_features)
 
-    raise NotImplementedError
-
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
     """Given a tensor of inputs, return the output of applying SiLU
@@ -508,6 +506,9 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
+    from cs336_basics import get_batch
+
+    return get_batch(dataset, batch_size, context_length, device)
     raise NotImplementedError
 
 
@@ -546,8 +547,8 @@ def run_cross_entropy(
     """
 
     from cs336_basics import cross_entropy
-    return cross_entropy(inputs, targets)
 
+    return cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(
@@ -561,6 +562,9 @@ def run_gradient_clipping(
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
+    from cs336_basics import clip_gradient_by_norm
+
+    return clip_gradient_by_norm(parameters, max_l2_norm)
     raise NotImplementedError
 
 
@@ -569,6 +573,7 @@ def get_adamw_cls() -> Any:
     Returns a torch.optim.Optimizer that implements AdamW.
     """
     from cs336_basics import AdamW
+
     return AdamW
 
 
@@ -597,7 +602,15 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    from cs336_basics import lr_cosine_schedule
+
+    return lr_cosine_schedule(
+        t=it,
+        lr_max=max_learning_rate,
+        lr_min=min_learning_rate,
+        T_warmup=warmup_iters,
+        T_cosine=cosine_cycle_iters,
+    )
 
 
 def run_save_checkpoint(
@@ -616,7 +629,9 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    from cs336_basics import save_checkpoint
+
+    save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -637,7 +652,9 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    from cs336_basics import load_checkpoint
+
+    return load_checkpoint(src, model, optimizer)
 
 
 def get_tokenizer(

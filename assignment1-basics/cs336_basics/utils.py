@@ -1,6 +1,11 @@
 import torch
+from torch import nn
 from torch import Tensor
 from jaxtyping import Float, Int
+from typing import Iterable, BinaryIO, IO
+import math
+import numpy
+import os
 
 
 def softmax(x: Tensor, dim: int = -1):
@@ -28,3 +33,93 @@ def cross_entropy(
     log_sum_exp = torch.logsumexp(shifted_logits, dim=-1)  # [...]
     out = log_sum_exp - target_logits  # [...]
     return out.mean()
+
+
+def lr_cosine_schedule(
+    t: int,
+    lr_max: float,
+    lr_min: float,
+    T_warmup: int,
+    T_cosine: int,
+) -> float:
+    if t < T_warmup:
+        return t / T_warmup * lr_max
+    elif t <= T_cosine:
+        den = T_cosine - T_warmup
+        if den > 0:
+            progress = (t - T_warmup) / den
+            return lr_min + 0.5 * (1 + math.cos(progress * math.pi)) * (lr_max - lr_min)
+        else:
+            return lr_min
+    else:
+        return lr_min
+
+
+def clip_gradient_by_norm(
+    params: Iterable[nn.Parameter],
+    max_norm: float = 1.0,
+    eps: float = 1e-6,
+):
+    total_sq = None
+    params = list(params)
+    with torch.no_grad():
+        for p in params:
+            if p.grad is None:
+                continue
+            grad = p.grad.to(dtype=torch.float32)
+            sq = grad.square().sum()
+            if total_sq is None:
+                total_sq = sq
+            else:
+                total_sq += sq
+
+        if total_sq is None:
+            return
+
+        global_norm = total_sq.sqrt()
+
+        if global_norm > max_norm:
+            scale = max_norm / (global_norm + eps)
+            for p in params:
+                if p.grad is None:
+                    continue
+                p.grad.mul_(scale)
+
+
+def get_batch(
+    token_ids: numpy.typing.NDArray,
+    batch_size: int,
+    context_length: int,
+    device: str = "cpu",
+):
+    tokens = torch.from_numpy(token_ids).to(device=device, dtype=torch.long)
+    seq_len = tokens.shape[0]
+    starts = torch.randint(0, seq_len - context_length, (batch_size,), device=device)
+    windows = tokens.unfold(dimension=0, size=context_length + 1, step=1)
+    samples = windows[starts]
+    return samples[:, :-1], samples[:, 1:]
+
+
+def save_checkpoint(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    iteration: int,
+    out: str | os.PathLike | BinaryIO | IO[bytes],
+):
+    final_state_dict = {}
+    final_state_dict["model"] = model.state_dict()
+    final_state_dict["optimizer"] = optimizer.state_dict()
+    final_state_dict["iteration"] = iteration
+    torch.save(final_state_dict, out)
+
+
+def load_checkpoint(
+    src: str | os.PathLike | BinaryIO | IO,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+) -> int:
+    total_state_dict = torch.load(src)
+    iteration = total_state_dict["iteration"]
+    model.load_state_dict(total_state_dict["model"])
+    optimizer.load_state_dict(total_state_dict["optimizer"])
+    return iteration
