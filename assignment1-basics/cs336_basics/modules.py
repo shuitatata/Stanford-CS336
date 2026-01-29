@@ -102,7 +102,7 @@ class SwiGLU(nn.Module):
     ):
         super().__init__()
         self.d_model = d_model
-        if d_ff == None:
+        if d_ff is None:
             self.d_ff = int(8 * d_model / 3)
         else:
             self.d_ff = d_ff
@@ -147,11 +147,20 @@ class RotaryPositionalEmbedding(nn.Module):
         x: Float[Tensor, "... seq_len d_k"],
         token_positions: Int[Tensor, "... seq_len"],
     ) -> Tensor:
+        # print(x.shape)
         cos = self.cos_table[token_positions].type_as(x)  # [..., seq_len, d_k/2]
         sin = self.sin_table[token_positions].type_as(x)  # [..., seq_len, d_k/2]
 
         x_even = x[..., 0::2]  # [..., seq_len, d_k/2]
         x_odd = x[..., 1::2]  # [..., seq_len, d_k/2]
+
+        missing = x_even.ndim - cos.ndim
+        if missing > 0:
+            for _ in range(missing):
+                cos = cos.unsqueeze(-3)
+                sin = sin.unsqueeze(-3)
+
+        # print(x_even.shape, cos.shape, sin.shape, x_odd.shape)
 
         out_even = x_even * cos - x_odd * sin  # [..., seq_len, d_k/2]
         out_odd = x_even * sin + x_odd * cos  # [..., seq_len, d_k/2]
@@ -196,8 +205,8 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
-        self.d_k = self.d_model // self.num_heads if dim_k == None else dim_k
-        self.d_v = self.d_k if dim_v == None else dim_v
+        self.d_k = self.d_model // self.num_heads if dim_k is None else dim_k
+        self.d_v = self.d_k if dim_v is None else dim_v
 
         # x: [..., seq_len, d_model]
         # Init projectors
@@ -233,7 +242,7 @@ class MultiHeadAttention(nn.Module):
         token_positions: Int[Tensor, "... seq_len"] | None = None,
     ):
 
-        if use_rope and token_positions == None:
+        if use_rope and token_positions is None:
             raise ValueError("token_positions must be provided when use_rope is True.")
 
         seq_len = x.shape[-2]
@@ -262,7 +271,7 @@ class MultiHeadAttention(nn.Module):
         )
 
         if use_rope and token_positions != None:
-            if self.rope == None:
+            if self.rope is None:
                 raise ValueError(
                     "RoPE module is not initialized in MultiHeadAttention."
                 )
@@ -384,7 +393,8 @@ class TransformerLM(nn.Module):
 
         token_positions = torch.arange(
             0, seq_len, device=x.device, dtype=torch.long
-        ).expand((batch_size, seq_len))
+        ).expand((batch_size, seq_len)) # Float[Tensor, "batch_size sequence_length"]
+
         for layer in self.layers:
             x = layer(
                 x, use_rope=True, token_positions=token_positions
