@@ -1,0 +1,66 @@
+from collections.abc import Callable, Iterable
+import math
+import torch
+
+
+class SGD(torch.optim.Optimizer):
+    def __init__(self, params, lr=1e-3):
+        if lr < 0:
+            raise ValueError(f"Invalid learning rate: {lr}")
+        defaults = {"lr": lr}
+        super().__init__(params, defaults)
+
+    def step(self, closure: Callable | None = None):
+        loss = None if closure is None else closure()
+        for group in self.param_groups:
+            lr = group["lr"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+
+                state = self.state[p]
+                t = state.get("t", 0)
+                grad = p.grad.data
+                p.data -= lr / math.sqrt(t + 1) * grad
+                state["t"] = t + 1
+        return loss
+
+
+class AdamW(torch.optim.Optimizer):
+    def __init__(
+        self, params, *, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01
+    ):
+        defaults = {"lr": lr, "betas": betas, "eps": eps, "weight_decay": weight_decay}
+
+        super().__init__(params, defaults=defaults)
+
+    def step(self, closure: Callable | None = None):
+        loss = None if closure is None else closure()
+        for group in self.param_groups:
+            beta1, beta2 = group["betas"]
+            lr = group["lr"]
+            eps = group["eps"]
+            weight_decay = group["weight_decay"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                g = p.grad
+                state = self.state[p]
+
+                m = state.get("m", torch.zeros_like(p.data, dtype=torch.float32))
+                v = state.get("v", torch.zeros_like(p.data, dtype=torch.float32))
+                t = state.get("t", 1)
+                m = beta1 * m + (1 - beta1) * g
+                v = beta2 * v + (1 - beta2) * g**2
+                lr_t = lr * math.sqrt(1 - (beta2) ** t) / (1 - (beta1) ** t)
+
+                with torch.no_grad():
+                    update = lr_t * m / (v.sqrt() + eps)
+                    p.add_(update, alpha=-1.0)
+                    p.add_(p, alpha=-lr * weight_decay)
+
+                state["m"] = m
+                state["v"] = v
+                state["t"] = t + 1
+
+        return loss
