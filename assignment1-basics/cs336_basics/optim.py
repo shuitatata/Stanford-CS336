@@ -44,20 +44,28 @@ class AdamW(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                g = p.grad
+                g = p.grad.detach()
+                g = g.to(dtype=torch.float32)
                 state = self.state[p]
 
-                m = state.get("m", torch.zeros_like(p.data, dtype=torch.float32))
-                v = state.get("v", torch.zeros_like(p.data, dtype=torch.float32))
-                t = state.get("t", 1)
-                m = beta1 * m + (1 - beta1) * g
-                v = beta2 * v + (1 - beta2) * g**2
+                if len(state) == 0:
+                    m = torch.zeros_like(p, dtype=torch.float32)
+                    v = torch.zeros_like(p, dtype=torch.float32)
+                    t = 1
+                else:
+                    m = state.get("m")
+                    v = state.get("v")
+                    t = state.get("t")
+
+                m.mul_(beta1).add_(g, alpha=1 - beta1)
+                v.mul_(beta2).addcmul_(g, g, value=1 - beta2)
+
                 lr_t = lr * math.sqrt(1 - (beta2) ** t) / (1 - (beta1) ** t)
 
                 with torch.no_grad():
                     update = lr_t * m / (v.sqrt() + eps)
                     p.add_(update, alpha=-1.0)
-                    p.add_(p, alpha=-lr * weight_decay)
+                    p.mul_(1 - lr * weight_decay)
 
                 state["m"] = m
                 state["v"] = v
