@@ -43,11 +43,6 @@ class Tokenizer:
         for _, token in self.vocab_byte.items():
             self.all_tokens_bytes.add(token)
 
-        # debug
-        # print(vocab)
-        # print(merges)
-        # print(self.merges_id_to_idx)
-
         # Add special tokens to vocabulary
         new_token_id = max(vocab.keys()) + 1
         if self.special_tokens:
@@ -57,6 +52,8 @@ class Tokenizer:
                     self.vocab_byte[new_token_id] = special_token.encode()
                     self.token_byte_to_id[special_token.encode()] = new_token_id
                     new_token_id += 1
+
+        self.vocab_size = len(self.vocab_byte)
 
     @classmethod
     def from_files(
@@ -129,10 +126,7 @@ class Tokenizer:
                 i += 1
         return tuple(new_pair_list)
 
-    def _get_pair_to_merge(
-        self,
-        token_id_list: list[int]
-    ) -> tuple[int, int] | None:
+    def _get_pair_to_merge(self, token_id_list: list[int]) -> tuple[int, int] | None:
         # [(token_id, token_id), (token_id, token_id), ...]
         pair_id_list = list(zip(token_id_list, token_id_list[1:]))
 
@@ -183,9 +177,6 @@ class Tokenizer:
                         for byte_val in word_bytes
                     ]
 
-                    print(word)
-                    print(token_id_list)
-
                     pair_to_merge_id = self._get_pair_to_merge(token_id_list)
 
                     while pair_to_merge_id is not None:
@@ -205,7 +196,6 @@ class Tokenizer:
                         )
 
                         pair_to_merge_id = self._get_pair_to_merge(token_id_list)
-
 
                     token_ids.extend(token_id_list)
 
@@ -232,13 +222,13 @@ class Tokenizer:
             text: Text string.
         """
 
-        print(f"decoding ids: {ids}")
+        # print(f"decoding ids: {ids}")
 
         text_bytes = bytes()
         for token_id in ids:
             text_bytes += self.vocab_byte[token_id]
 
-        return text_bytes.decode(errors='replace')
+        return text_bytes.decode(errors="replace")
 
 
 if __name__ == "__main__":
