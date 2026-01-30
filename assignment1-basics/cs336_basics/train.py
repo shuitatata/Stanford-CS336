@@ -15,6 +15,7 @@ import os
 from tqdm import tqdm
 import argparse
 from pathlib import Path
+import random
 
 
 def parse_args():
@@ -270,6 +271,7 @@ def load_data(tokenizer: Tokenizer, path: Path) -> np.typing.NDArray:
 
 def main(args):
     # Set random seed
+    random.seed(args.seed)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
