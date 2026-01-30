@@ -9,6 +9,7 @@ import pstats
 import tracemalloc
 import json
 import heapq
+import time
 
 
 def find_chunk_boundaries(
@@ -318,20 +319,18 @@ def main():
 
 
 if __name__ == "__main__":
-    pr = cProfile.Profile()
-    # tracemalloc.start()
-    pr.enable()
+
+    start_time = time.time()
+
     vocab, merges = train_bpe(
-        "/Users/shuitata/PlayGround/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
-        # "/Users/shuitata/PlayGround/cs336/assignment1-basics/tests/fixtures/corpus.en",
-        500,
+        "./data/TinyStoriesV2-GPT4-train.txt",
+        10000,
         ["<|endoftext|>"],
-        20,
+        40,
     )
 
-    pr.disable()
-    stats = pstats.Stats(pr).sort_stats("cumtime")
-    stats.print_stats()
+    mid_time = time.time()
+    print(f"Training time: {mid_time - start_time} seconds")
 
     with open("./data/TinyStories_vocab.json", "w") as f:
         vocab_to_save = {
@@ -346,8 +345,9 @@ if __name__ == "__main__":
             for first, second in merges
         ]
         json.dump(merges_to_save, f, ensure_ascii=False, indent=2)
-        # for first, second in merges:
-        #     f.write(f"{first.decode("latin-1")} {second.decode("latin-1")}\n")
+
+    end_time = time.time()
+    print(f"Saving time: {end_time - mid_time} seconds")
 
     # current, peak = tracemalloc.get_traced_memory()
 

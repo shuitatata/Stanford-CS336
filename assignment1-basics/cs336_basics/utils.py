@@ -59,7 +59,7 @@ def clip_gradient_by_norm(
     params: Iterable[nn.Parameter],
     max_norm: float = 1.0,
     eps: float = 1e-6,
-):
+) -> float:
     total_sq = None
     params = list(params)
     with torch.no_grad():
@@ -74,7 +74,7 @@ def clip_gradient_by_norm(
                 total_sq += sq
 
         if total_sq is None:
-            return
+            return 0.0
 
         global_norm = total_sq.sqrt()
 
@@ -85,6 +85,8 @@ def clip_gradient_by_norm(
                     continue
                 p.grad.mul_(scale)
 
+    return global_norm.item()
+
 
 def get_batch(
     token_ids: numpy.typing.NDArray,
@@ -92,11 +94,12 @@ def get_batch(
     context_length: int,
     device: str = "cpu",
 ):
-    tokens = torch.from_numpy(token_ids).to(device=device, dtype=torch.long)
-    seq_len = tokens.shape[0]
-    starts = torch.randint(0, seq_len - context_length, (batch_size,), device=device)
-    windows = tokens.unfold(dimension=0, size=context_length + 1, step=1)
-    samples = windows[starts]
+    seq_len = len(token_ids)
+    starts = numpy.random.randint(0, seq_len - context_length, size=(batch_size,))
+    samples = numpy.stack(
+        [token_ids[start : start + context_length + 1] for start in starts]
+    )
+    samples = torch.from_numpy(samples).to(device=device, dtype=torch.long)
     return samples[:, :-1], samples[:, 1:]
 
 
