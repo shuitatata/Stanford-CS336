@@ -4,6 +4,7 @@ import math
 from einops import einsum, rearrange
 from jaxtyping import Bool, Float, Int
 from .utils import softmax
+from .tokenizer import Tokenizer
 
 
 class Linear(nn.Module):
@@ -378,7 +379,16 @@ class TransformerLM(nn.Module):
         self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
-    def forward(self, in_indices: Int[Tensor, "batch_size sequence_length"]):
+    def forward(
+        self, in_indices: Int[Tensor, "batch_size sequence_length"]
+    ) -> Float[Tensor, "batch_size sequence_length vocab_size"]:
+        if in_indices.ndim < 2:
+            in_indices = in_indices.unsqueeze(0)
+        elif in_indices.ndim > 2:
+            raise ValueError(
+                f"TransformerLM.forward expected input with 2 dimensions (batch_size, sequence_length), but got shape {tuple(in_indices.shape)}"
+            )
+
         batch_size = in_indices.shape[0]
         seq_len = in_indices.shape[1]
 
@@ -393,7 +403,9 @@ class TransformerLM(nn.Module):
 
         token_positions = torch.arange(
             0, seq_len, device=x.device, dtype=torch.long
-        ).expand((batch_size, seq_len)) # Float[Tensor, "batch_size sequence_length"]
+        ).expand(
+            (batch_size, seq_len)
+        )  # Float[Tensor, "batch_size sequence_length"]
 
         for layer in self.layers:
             x = layer(
@@ -403,3 +415,62 @@ class TransformerLM(nn.Module):
         x = self.ln_final(x)  # Float[Tensor, "batch_size sequence_length d_model"]
         x = self.lm_head(x)  # Float[Tensor, "batch_size sequence_length vocab_size"]
         return x
+
+
+def generate(
+    model: nn.Module,
+    tokenizer: Tokenizer,
+    prompt: str,
+    max_new_tokens: int,
+    temperature: float = 1.0,
+    top_p: float = 0.9,
+    end_token: str | None = None,
+    device: str = "mps",
+) -> str:
+    input_ids = tokenizer.encode(prompt)
+    input_ids_tensor = torch.tensor([input_ids], device=device)
+    output_token_ids = []
+    end_token_id = (
+        tokenizer.encode("<|endoftext|>")
+        if end_token is None
+        else tokenizer.encode(end_token)
+    )[0]
+
+    while len(output_token_ids) < max_new_tokens:
+        with torch.no_grad():
+            logits = model(input_ids_tensor)
+            if temperature == 0.0:
+                next_token_id = torch.argmax(logits[0, -1, :]).item()
+            elif temperature < 0.0:
+                raise ValueError("temperature must be non-negative.")
+            else:
+                next_token_logits = logits[0, -1, :] / temperature
+                probs = softmax(next_token_logits, dim=-1)
+
+                if top_p < 1.0:
+                    sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+                    cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+                    keep = cumulative_probs < top_p
+                    keep[..., 1:] = keep[..., :-1].clone()
+                    keep[..., 0] = True
+
+                    sorted_probs = sorted_probs * keep
+                    sorted_probs = sorted_probs / sorted_probs.sum(dim=-1, keepdim=True)
+                    next_token_id = torch.multinomial(
+                        sorted_probs, num_samples=1
+                    ).item()
+                    next_token_id = sorted_indices[next_token_id].item()
+                else:
+                    next_token_id = torch.multinomial(probs, num_samples=1).item()
+
+            output_token_ids.append(next_token_id)
+
+            if next_token_id == end_token_id:
+                break
+
+            input_ids.append(next_token_id)
+            if len(input_ids) > model.context_length:
+                input_ids = input_ids[-model.context_length :]
+            input_ids_tensor = torch.tensor([input_ids], device=device)
+
+    return tokenizer.decode(output_token_ids)

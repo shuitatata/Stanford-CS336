@@ -19,6 +19,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "wandb>=0.22.3",
     "ty>=0.0.1a16",
+    "pyyaml>=6.0.2",
 ]
 
 [build-system]
