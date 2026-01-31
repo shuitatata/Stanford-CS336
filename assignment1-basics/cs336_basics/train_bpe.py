@@ -216,7 +216,9 @@ def train_bpe(
             partial(_bpe_worker, input_path, special_tokens),
             zip(boundaries[:-1], boundaries[1:]),
         )
-        word_counts: collections.Counter = sum(local_counts_list, collections.Counter())
+        word_counts: collections.Counter = collections.Counter()
+        for local_counts in local_counts_list:
+            word_counts.update(local_counts)
 
     # Initialize vocab with standard ASCII/Byte range
     vocab = {k: bytes([k]) for k in range(256)}

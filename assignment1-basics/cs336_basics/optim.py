@@ -10,7 +10,7 @@ class SGD(torch.optim.Optimizer):
         defaults = {"lr": lr}
         super().__init__(params, defaults)
 
-    def step(self, closure: Callable | None = None):
+    def step(self, closure: Callable | None = None):  # type: ignore[reportIncompatibleMethodOverride]
         loss = None if closure is None else closure()
         for group in self.param_groups:
             lr = group["lr"]
@@ -34,7 +34,7 @@ class AdamW(torch.optim.Optimizer):
 
         super().__init__(params, defaults=defaults)
 
-    def step(self, closure: Callable | None = None):
+    def step(self, closure: Callable | None = None):  # type: ignore[reportIncompatibleMethodOverride]
         loss = None if closure is None else closure()
         for group in self.param_groups:
             beta1, beta2 = group["betas"]

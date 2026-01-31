@@ -96,7 +96,7 @@ class SwiGLU(nn.Module):
     def __init__(
         self,
         d_model: int,
-        d_ff: int = None,
+        d_ff: int | None = None,
         *,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
@@ -119,6 +119,9 @@ class SwiGLU(nn.Module):
 
 
 class RotaryPositionalEmbedding(nn.Module):
+    cos_table: Tensor
+    sin_table: Tensor
+
     def __init__(self, theta: float, d_k: int, max_seq_len: int, *, device=None):
         super().__init__()
         self.theta = theta
@@ -281,7 +284,7 @@ class MultiHeadAttention(nn.Module):
                 k = self.rope(k, token_positions)
 
         causal_mask = torch.tril(
-            torch.ones(seq_len, seq_len, dtype=bool, device=x.device)
+            torch.ones(seq_len, seq_len, dtype=torch.bool, device=x.device)
         )
 
         attn_out_batch_head = scaled_dot_product_attention(
@@ -392,7 +395,7 @@ class TransformerLM(nn.Module):
         batch_size = in_indices.shape[0]
         seq_len = in_indices.shape[1]
 
-        if seq_len > self.layers[0].attn.rope.max_seq_len:
+        if seq_len > self.context_length:
             raise ValueError(
                 f"Input sequence length {seq_len} exceeds the maximum sequence length {self.context_length} supported by RoPE."
             )
@@ -418,14 +421,14 @@ class TransformerLM(nn.Module):
 
 
 def generate(
-    model: nn.Module,
+    model: TransformerLM,
     tokenizer: Tokenizer,
     prompt: str,
     max_new_tokens: int,
     temperature: float = 1.0,
     top_p: float = 0.9,
     end_token: str | None = None,
-    device: str = "mps",
+    device: torch.device | str = "mps",
 ) -> str:
     input_ids = tokenizer.encode(prompt)
     input_ids_tensor = torch.tensor([input_ids], device=device)
@@ -459,16 +462,16 @@ def generate(
                     next_token_id = torch.multinomial(
                         sorted_probs, num_samples=1
                     ).item()
-                    next_token_id = sorted_indices[next_token_id].item()
+                    next_token_id = sorted_indices[int(next_token_id)].item()
                 else:
                     next_token_id = torch.multinomial(probs, num_samples=1).item()
 
-            output_token_ids.append(next_token_id)
+            output_token_ids.append(int(next_token_id))
 
             if next_token_id == end_token_id:
                 break
 
-            input_ids.append(next_token_id)
+            input_ids.append(int(next_token_id))
             if len(input_ids) > model.context_length:
                 input_ids = input_ids[-model.context_length :]
             input_ids_tensor = torch.tensor([input_ids], device=device)

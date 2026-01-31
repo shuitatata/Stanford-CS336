@@ -1,6 +1,7 @@
 from typing import Self, Iterable, Iterator
 import json
 import regex as re
+from pathlib import Path
 
 
 class Tokenizer:
@@ -58,8 +59,8 @@ class Tokenizer:
     @classmethod
     def from_files(
         cls,
-        vocab_filepath: str,
-        merges_filepath: str,
+        vocab_filepath: Path|str,
+        merges_filepath: Path | str,
         special_tokens: list[str] | None = None,
     ) -> Self:
         """
@@ -87,7 +88,7 @@ class Tokenizer:
                 for first, second in merges_decoded
             ]
 
-        return Tokenizer(vocab, merges, special_tokens)
+        return cls(vocab, merges, special_tokens)
 
     def _merge_pair(
         self,
@@ -106,7 +107,7 @@ class Tokenizer:
             new_word: The updated list of token IDs for the word.
         """
         word_len = len(word)
-        new_pair_list = []
+        new_pair_list: list[int] = []
         left_id, right_id = pair_to_merge
 
         i = 0
@@ -124,7 +125,7 @@ class Tokenizer:
             else:
                 new_pair_list.append(word[i])
                 i += 1
-        return tuple(new_pair_list)
+        return new_pair_list
 
     def _get_pair_to_merge(self, token_id_list: list[int]) -> tuple[int, int] | None:
         # [(token_id, token_id), (token_id, token_id), ...]
@@ -165,7 +166,7 @@ class Tokenizer:
         for segment in text_segments_list:
             if not segment:
                 continue
-            elif segment in self.special_tokens:
+            elif self.special_tokens is not None and segment in self.special_tokens:
                 token_ids.append(self.token_byte_to_id[segment.encode()])
             else:  # normal text
                 # Pre-tokenize
