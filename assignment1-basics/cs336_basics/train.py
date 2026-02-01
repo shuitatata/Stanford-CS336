@@ -121,18 +121,22 @@ def train(
         if (step + 1) % training_cfg["eval_interval"] == 0:
             model.eval()
             with torch.no_grad():
-                x_val, y_val = get_batch(
-                    validation_data,
-                    training_cfg["batch_size"],
-                    model_cfg["context_length"],
-                    device=device,
-                )
-                logits_val = model(x_val)
-                val_loss = cross_entropy(logits_val, y_val)
-                tqdm.write(f"Validation loss at step {step + 1}: {val_loss.item():.4f}")
+                losses = []
+                for _ in range(training_cfg.get("eval_batches", 1)):
+                    x_val, y_val = get_batch(
+                        validation_data,
+                        training_cfg["batch_size"],
+                        model_cfg["context_length"],
+                        device=device,
+                    )
+                    logits_val = model(x_val)
+                    val_loss = cross_entropy(logits_val, y_val)
+                    losses.append(val_loss.item())
+                avg_val_loss = sum(losses) / len(losses)
+                tqdm.write(f"Validation loss at step {step + 1}: {avg_val_loss:.4f}")
             model.train()
             if wandb_cfg.get("enabled", True):
-                wandb.log({"val/loss": val_loss.item()}, step=step + 1)
+                wandb.log({"val/loss": avg_val_loss}, step=step + 1)
 
 
 def main(cfg):
