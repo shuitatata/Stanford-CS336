@@ -20,9 +20,10 @@ training:
   num_steps: 500
   total_tokens: 327680000
   eval_interval: 100
+  eval_batches: 10
   save_interval: 1000
   save_dict: checkpoints/
-  device: cuda:1
+  device: cuda
 
 optimizer:
   lr: 0.003

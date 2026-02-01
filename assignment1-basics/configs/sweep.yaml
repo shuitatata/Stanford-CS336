@@ -1,0 +1,26 @@
+program: cs336_basics.sweep_train  # 你的入口脚本
+method: random     # 策略：random, grid, bayes
+metric:
+  name: val/loss   # 优化的目标 (要和 train.py 里 wandb.log 的 key 一致)
+  goal: minimize   # 目标是最小化 loss
+parameters:
+  # 这里定义你要搜索的参数
+  # 注意：使用了 "." 符号来对应我们刚才在 update_cfg_from_wandb 里的逻辑
+  optimizer.lr_max:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-2
+  
+  # 你也可以搜索 batch size
+  training.batch_size:
+    values: [64, 128]
+
+command:
+  - ${env}
+  - uv
+  - run 
+  - -m
+  - ${program}
+  - "--config"
+  - "configs/baseline_cuda.yaml" # 基础配置
+  - ${args}              # wandb 会把 sweep 参数通过 args 传进去(或通过环境变量)
