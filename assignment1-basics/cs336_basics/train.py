@@ -106,16 +106,14 @@ def train(
                 )
         if (step + 1) % training_cfg["save_interval"] == 0:
             # Save model checkpoint
-            save_time = time.strftime("%d-%H-%M-%S", time.gmtime())
-            save_dict = Path(training_cfg.get("save_dict")) / f"{save_time}"
             file_name = f"model_step_{step + 1}.pth"
-            save_path = save_dict / file_name
-            if not save_dict.exists():
-                save_dict.mkdir(parents=True)
+            save_path = Path(training_cfg["save_dict"]) / file_name
             save_checkpoint(model, optimizer, step + 1, save_path)
 
             # Save configs
-            with open(save_dict / "config.yaml", "w", encoding="utf-8") as f:
+            with open(
+                Path(training_cfg["save_dict"]) / "config.yaml", "w", encoding="utf-8"
+            ) as f:
                 yaml.safe_dump(cfg, f)
 
             tqdm.write(f"Model checkpoint saved at step {step + 1} to {save_path}")
@@ -184,6 +182,19 @@ def main(cfg):
 
     # Train
     if not inference_cfg["enabled"]:
+        # Initialize ckpt save directory
+        save_dict = Path(training_cfg.get("save_path", "checkpoints"))
+        if wandb_cfg["enabled"] and wandb_cfg["run_name"] is not None:
+            save_dict = save_dict / wandb_cfg.get("run_name")
+        else:
+            time_stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+            save_dict = save_dict / f"{time_stamp}_seed{seed}"
+
+        if not save_dict.exists():
+            save_dict.mkdir(parents=True)
+        print(f"Model checkpoints will be saved to: {save_dict}")
+        cfg["training"]["save_dict"] = str(save_dict)
+
         # Initialize logger
         if wandb_cfg.get("enabled", True):
             wandb.init(

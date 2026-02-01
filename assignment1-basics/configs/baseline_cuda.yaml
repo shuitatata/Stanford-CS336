@@ -1,0 +1,49 @@
+seed: 42
+
+tokenizer:
+  vocab_file: data/TinyStories_vocab.json
+  merges_file: data/TinyStories_merges.json
+  special_tokens: ["<|endoftext|>"]
+
+model:
+  context_length: 256
+  num_layers: 4
+  d_model: 512
+  num_heads: 16
+  d_ff: 1344
+  rope_theta: 100000
+
+training:
+  training_data_file: data/TinyStoriesV2-GPT4-train.txt
+  validation_data_file: data/TinyStoriesV2-GPT4-valid.txt
+  batch_size: 128
+  num_steps: 500
+  total_tokens: 327680000
+  eval_interval: 100
+  save_interval: 1000
+  save_dict: checkpoints/
+  device: cuda:1
+
+optimizer:
+  lr: 0.003
+  betas: [0.9, 0.999]
+  weight_decay: 0.01
+  lr_min: 0.00001
+  lr_max: 0.003
+  cosine_steps: null
+  warmup_steps: null
+
+logging:
+  log_interval: 10
+  wandb:
+    enabled: true
+    project: cs336-assignment1-transformer-lm
+    run_name: baseline-cuda
+
+inference:
+  enabled: false
+  max_new_tokens: 1024
+  temperature: 1.0
+  top_p: 0.9
+  end_token: "<|endoftext|>"
+  prompt: "Once upon a time"
