@@ -5,6 +5,7 @@ import json
 import logging
 import math
 import os
+from typing import cast
 from einops import rearrange, einsum
 import einx
 
@@ -111,6 +112,8 @@ class RMSNorm(nn.Module):
 
 
 class RotaryEmbedding(nn.Module):
+    _freq_cis_cache: Tensor
+
     def __init__(self, context_length: int, dim: int, theta: float = 10000.0):
         super().__init__()
         self.register_buffer(
@@ -138,12 +141,27 @@ class RotaryEmbedding(nn.Module):
         # cos, sin = self._freq_cis_cache[:, pos_ids, :]
 
         # einx
-        cos, sin = einx.get_at('cos_sin [pos] half_dim, ... -> cos_sin ... half_dim', self._freq_cis_cache, pos_ids)
+        cos_sin = cast(
+            Tensor,
+            einx.get_at(
+                "cos_sin [pos] half_dim, ... -> cos_sin ... half_dim",
+                self._freq_cis_cache,
+                pos_ids,
+            ),
+        )
+        cos, sin = cos_sin.unbind(dim=0)
 
         # 2D rotation matrix applied to pairs in x
         x1_rot = cos * x1 - sin * x2
         x2_rot = sin * x1 + cos * x2
-        result = einx.rearrange('... x_half, ... x_half -> ... (x_half (1 + 1))', x1_rot, x2_rot).contiguous()
+        result = cast(
+            Tensor,
+            einx.rearrange(
+                "... x_half, ... x_half -> ... (x_half (1 + 1))",
+                x1_rot,
+                x2_rot,
+            ),
+        ).contiguous()
         return result
     
     def extra_repr(self):
@@ -498,7 +516,14 @@ class CausalMultiHeadSelfAttention(nn.Module):
         )  # fmt: skip
 
         if token_positions is None:
-            token_positions = einx.rearrange("seq -> b... seq", torch.arange(sequence_length, device=x.device), b=[1] * len(b))
+            token_positions = cast(
+                Tensor,
+                einx.rearrange(
+                    "seq -> b... seq",
+                    torch.arange(sequence_length, device=x.device),
+                    b=[1] * len(b),
+                ),
+            )
 
         # Duplicate token positions for each head
         token_positions = rearrange(token_positions, "... seq -> ... 1 seq")
@@ -508,8 +533,8 @@ class CausalMultiHeadSelfAttention(nn.Module):
 
         # Construct causal mask
         seq = torch.arange(sequence_length, device=x.device)
-        qi = einx.rearrange('query -> b... 1 query 1', seq, b=[1] * len(b))
-        kj = einx.rearrange('key   -> b... 1 1   key', seq, b=[1] * len(b))
+        qi = cast(Tensor, einx.rearrange("query -> b... 1 query 1", seq, b=[1] * len(b)))
+        kj = cast(Tensor, einx.rearrange("key   -> b... 1 1   key", seq, b=[1] * len(b)))
         causal_mask = qi >= kj  # (query, key)
 
         # Shape: (..., num_heads, sequence_length, d_k)
