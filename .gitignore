@@ -170,3 +170,5 @@ cython_debug/
 data/
 wandb/
 checkpoints/
+
+*.nsys-rep
