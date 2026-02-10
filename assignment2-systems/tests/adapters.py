@@ -5,7 +5,6 @@ from typing import Type
 import torch
 
 
-
 def get_flashattention_autograd_function_pytorch() -> Type:
     """
     Returns a torch.autograd.Function subclass that implements FlashAttention2.
@@ -17,8 +16,8 @@ def get_flashattention_autograd_function_pytorch() -> Type:
     """
     # For example: return MyFlashAttnAutogradFunctionClass
     from cs336_systems.flash_attn import PytorchFlashAttention
+
     return PytorchFlashAttention
-    raise NotImplementedError
 
 
 def get_flashattention_autograd_function_triton() -> Type:
@@ -35,8 +34,8 @@ def get_flashattention_autograd_function_triton() -> Type:
     """
     # For example: return MyTritonFlashAttentionAutogradFunctionClass
     from cs336_systems.flash_attn import TritonFlashAttention
+
     return TritonFlashAttention
-    raise NotImplementedError
 
 
 def get_ddp_individual_parameters(module: torch.nn.Module) -> torch.nn.Module:
@@ -57,10 +56,14 @@ def get_ddp_individual_parameters(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDPIndividualParameters(module)
-    raise NotImplementedError
+    from cs336_systems.ddp import DDPIndividualParameters
+
+    return DDPIndividualParameters(module)
 
 
-def ddp_individual_parameters_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
+def ddp_individual_parameters_on_after_backward(
+    ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer
+):
     """
     Code to run after the backward pass is completed, but before we take
     an optimizer step.
@@ -72,7 +75,9 @@ def ddp_individual_parameters_on_after_backward(ddp_model: torch.nn.Module, opti
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    from cs336_systems.ddp import DDPIndividualParameters
+
+    ddp_model.finish_gradient_synchronization()
 
 
 def get_ddp_bucketed(module: torch.nn.Module, bucket_size_mb: float) -> torch.nn.Module:
@@ -93,10 +98,14 @@ def get_ddp_bucketed(module: torch.nn.Module, bucket_size_mb: float) -> torch.nn
     Returns:
         Instance of a DDP class.
     """
-    raise NotImplementedError
+    from cs336_systems.ddp import DDPBucketedParameters
+
+    return DDPBucketedParameters(module, bucket_size_mb)
 
 
-def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
+def ddp_bucketed_on_after_backward(
+    ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer
+):
     """
     Code to run after the backward pass is completed, but before we take
     an optimizer step.
@@ -108,10 +117,14 @@ def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    from cs336_systems.ddp import DDPBucketedParameters
+
+    ddp_model.finish_gradient_synchronization()
 
 
-def ddp_bucketed_on_train_batch_start(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
+def ddp_bucketed_on_train_batch_start(
+    ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer
+):
     """
     Code to run at the very start of the training step.
 
@@ -121,7 +134,9 @@ def ddp_bucketed_on_train_batch_start(ddp_model: torch.nn.Module, optimizer: tor
         optimizer: torch.optim.Optimizer
             Optimizer being used with the DDP-wrapped model.
     """
-    raise NotImplementedError
+    from cs336_systems.ddp import DDPBucketedParameters
+
+    ddp_model.reset_bucket_state()
 
 
 def get_sharded_optimizer(params, optimizer_cls: Type[torch.optim.Optimizer], **kwargs) -> torch.optim.Optimizer:
