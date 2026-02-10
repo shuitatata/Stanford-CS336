@@ -139,7 +139,9 @@ def ddp_bucketed_on_train_batch_start(
     ddp_model.reset_bucket_state()
 
 
-def get_sharded_optimizer(params, optimizer_cls: Type[torch.optim.Optimizer], **kwargs) -> torch.optim.Optimizer:
+def get_sharded_optimizer(
+    params, optimizer_cls: Type[torch.optim.Optimizer], **kwargs
+) -> torch.optim.Optimizer:
     """
     Returns a torch.optim.Optimizer that handles optimizer state sharding
     of the given optimizer_cls on the provided parameters.
@@ -155,4 +157,6 @@ def get_sharded_optimizer(params, optimizer_cls: Type[torch.optim.Optimizer], **
     Returns:
         Instance of sharded optimizer.
     """
-    raise NotImplementedError
+    from cs336_systems.sharded_optimizer import ShardedOptimizer
+
+    return ShardedOptimizer(params, optimizer_cls, **kwargs)
