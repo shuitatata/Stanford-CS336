@@ -172,3 +172,10 @@ wandb/
 checkpoints/
 
 *.nsys-rep
+
+# assignment5-alignment (merged from nested repo)
+assignment5-alignment/*.bin
+assignment5-alignment/models/
+assignment5-alignment/nav
+assignment5-alignment/tags
+assignment5-alignment/.python-version
