@@ -179,3 +179,5 @@ assignment5-alignment/models/
 assignment5-alignment/nav
 assignment5-alignment/tags
 assignment5-alignment/.python-version
+
+.wheels/
