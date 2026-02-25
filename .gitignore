@@ -181,3 +181,5 @@ assignment5-alignment/tags
 assignment5-alignment/.python-version
 
 .wheels/
+
+data/raw
