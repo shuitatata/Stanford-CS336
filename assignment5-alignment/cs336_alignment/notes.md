@@ -17,6 +17,7 @@ hfd garg-aayush/sft-cs336-assign5-datasets --local-dir ./data/math/raw/ --datase
 # 将数据集移动到指定位置
 ln -sf ./raw/sft-reason/val.jsonl data/math/validation.jsonl
 ln -sf ./raw/sft-reason/sft_gpt-oss-120b_filtered.jsonl data/math/sft.jsonl
+ln -sf ./raw/sft-reason/train.jsonl data/math/train.jsonl
 ```
 ### 处理
 1. 调整编码为可读 UTF-8
